@@ -1,0 +1,168 @@
+---
+title: "DATA 605 - Final"
+author: "Suma Gopal"
+date: "12/15/2019"
+output: html_document
+runtime: shiny
+---
+
+```{r}
+  # Import library
+  library(corrplot)
+  library(DT)
+  library(dplyr)
+  library(ggplot2)
+  library(matrixcalc)
+  library(stats)
+```
+
+# Problem 1
+Using R, generate a random variable X that has 10,000 random uniform numbers from 1 to N, where N can be any number of your choosing greater than or equal to 6.  Then generate a random variable Y that has 10,000 random normal numbers with a mean of μ=σ=(N+1)/2.  
+
+```{r}
+  # Random variable X
+  N <- round(runif(1, 6, 500))
+  X <- runif(10000, min=0, max=N)
+  
+  #Random variable Y
+  Y <- rnorm(10000, (N+1)/2,(N+1)/2)
+```
+
+Probability. Calculate as a minimum the below probabilities a through c.  Assume the small letter "x" is estimated as the median of the X variable, and the small letter "y" is estimated as the 1st quartile of the Y variable.  Interpret the meaning of all probabilities.  
+
+a. P(X > x | X > y)  
+```{r}
+  x <- median(X)
+  y <- quantile(Y, 0.25)
+  sum(X > x & X > y)/sum(X > y)
+```
+
+b. P(X > x, Y > y)  
+```{r}
+  sum(X > x & Y > y)/10000
+```
+
+c. P(X < x | X > y)  
+```{r}
+  sum(X < x & X > y)/10000
+```
+
+Investigate whether P(X>x and Y>y)=P(X>x)P(Y>y) by building a table and evaluating the marginal and joint probabilities.   
+```{r}
+  # We build the table!!
+  problemOneTable <- matrix(c(sum(X > x & Y > y), sum(X < x & Y > y), sum(X > x & Y > y) + sum(X < x & Y > y), sum(X > x & Y < y), sum(X < x & Y < y), sum(X > x & Y < y) + sum(X < x & Y < y), sum(X > x & Y > y) + sum(X > x & Y < y), sum(X < x & Y > y) + sum(X < x & Y < y), sum(X > x & Y > y) + sum(X < x & Y > y) + sum(X > x & Y < y) + sum(X < x & Y < y)), nrow=3, ncol = 3)
+  colnames(problemOneTable) = c("Y > y", "Y < y", "All")
+  rownames(problemOneTable) = c("X > x", "X < x", "All")
+  datatable(problemOneTable)
+```
+
+Check to see if independence holds by using Fisher’s Exact Test and the Chi Square Test.  What is the difference between the two? Which is most appropriate?   
+```{r}
+  # Fisher's Exact Test
+  fisher.test(problemOneTable, simulate.p.value=TRUE)
+
+  # Chi Square Test
+  chisq.test(problemOneTable, correct=TRUE)
+```
+
+# Problem 2
+
+Descriptive and Inferential Statistics. Provide univariate descriptive statistics and appropriate plots for the training data set.  Provide a scatterplot matrix for at least two of the independent variables and the dependent variable. Derive a correlation matrix for any three quantitative variables in the dataset.  Test the hypotheses that the correlations between each pairwise set of variables is 0 and provide an 80% confidence interval.  Discuss the meaning of your analysis.  Would you be worried about familywise error? Why or why not?  
+
+```{r}
+  trainData <- read.csv(file="/Users/suma/Desktop/CUNY SPS - Masters Data Science/DATA 605/house-prices-advanced-regression-techniques/train.csv", header=TRUE, sep=",")
+
+# Display train data
+renderDT(
+  trainData, options = list(
+    pageLength = 5)
+  )
+
+# Summary Statistics
+summary(trainData)
+
+# Appropriate plots
+
+# Boxplot 
+ggplot(trainData, aes(x=YearBuilt, y=OverallCond, fill=YearBuilt, group=YearBuilt)) + geom_boxplot() + labs(title="Overall Condition vs YearBuilt", x="Year Built", y="Overall Condition")
+
+# Histograms
+
+ggplot(trainData, aes(x=SalePrice)) + geom_histogram(fill="blue") + labs(title="Sale Price", x="Sale Price")
+
+ggplot(trainData, aes(x=OverallCond, color=LotShape)) +
+  geom_histogram(fill="white", alpha=0.5, position="identity") + labs(title = "Overall Condition by LotShape", x = "Overall Condition")
+
+# Scatterplot
+
+ggplot(trainData, aes(x=YearBuilt, y=SalePrice)) + geom_point() + labs(title="Sale Price vs Year Built Scatter Plot", x="Year Built", y="Sale Price")
+
+# 2 Independent Variables: Lot Frontage and Garage Area, and Dependent Variable Sale Price 
+pairs(~SalePrice+LotFrontage+GarageArea,data=trainData, main="Scatterplot Matrix")
+
+```
+
+Correlation Matrix:  
+```{r}
+  trainCorrMatrix <- cor(dplyr::select(trainData, GarageArea, BsmtUnfSF, GrLivArea, SalePrice))
+  trainCorrMatrix
+  
+  # Correlation Plot - two useful ways to view
+  # With Numbers
+  corrplot(trainCorrMatrix, method="number")
+  
+  # With Colors
+  corrplot(trainCorrMatrix, method="color")
+
+```
+
+Test the hypothesis
+
+We see that all p-values for all three quantitative variables are consistently very small small, under 0.05. Thus, we reject the null hypothesis. Generally though, we know that p-values alone are valid enough to provide accurate predictions. Family wise error <= 1 - (1-alpha)^c. I think Family wise error will be high because there are not enough series of tests done - the more tests that are done, the lower the error.
+
+80% confidence that there is correlation with these two variables between 0.60 and 0.64
+```{r}
+  cor.test(trainData$SalePrice,trainData$GarageArea, conf.level = 0.8)
+```
+
+80% confidence that there is correlation with these two variables between 0.18 and 0.24
+
+```{r}
+  cor.test(trainData$SalePrice,trainData$BsmtUnfSF, conf.level = 0.8)
+```
+
+80% confidence that there is correlation with these two variables between 0.69 and 0.72
+
+```{r}
+  cor.test(trainData$SalePrice,trainData$GrLivArea, conf.level = 0.8)
+```
+
+Linear Algebra and Correlation.  Invert your correlation matrix from above. (This is known as the precision matrix and contains variance inflation factors on the diagonal.) Multiply the correlation matrix by the precision matrix, and then multiply the precision matrix by the correlation matrix. Conduct LU decomposition on the matrix.  
+
+```{r}
+  # Precision Matrix - Invert correlation matrix
+  trainPrecisionMatrix <- solve(trainCorrMatrix)
+
+  # Multiply correlation matrix by the precision matrix
+  round(trainCorrMatrix %*% trainPrecisionMatrix)
+
+  # Multiply the precisio matrix by the correlation matrix
+  round(trainPrecisionMatrix %*% trainCorrMatrix)
+```
+
+
+LU decomposition on the matrix.  
+```{r}
+  lu.decomposition(trainCorrMatrix)$U
+  lu.decomposition(trainCorrMatrix)$L
+  
+  lu.decomposition(trainPrecisionMatrix)$U
+  lu.decomposition(trainPrecisionMatrix)$L
+```
+
+Calculus-Based Probability & Statistics.  Many times, it makes sense to fit a closed form distribution to data.  Select a variable in the Kaggle.com training dataset that is skewed to the right, shift it so that the minimum value is absolutely above zero if necessary.  Then load the MASS package and run fitdistr to fit an exponential probability density function.  (See  https://stat.ethz.ch/R-manual/R-devel/library/MASS/html/fitdistr.html ).  Find the optimal value of λ for this distribution, and then take 1000 samples from this exponential distribution using this value (e.g., rexp(1000, λ)).  Plot a histogram and compare it with a histogram of your original variable.   Using the exponential pdf, find the 5th and 95th percentiles using the cumulative distribution function (CDF).   Also generate a 95% confidence interval from the empirical data, assuming normality.  Finally, provide the empirical 5th percentile and 95th percentile of the data. Discuss.  
+
+```{r}
+  library(MASS)
+  hist(trainData$GrLivArea)
+```
