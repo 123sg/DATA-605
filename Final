@@ -10,6 +10,7 @@ output: html_document
   library(DT)
   library(dplyr)
   library(ggplot2)
+  library(knitr)
   library(matrixcalc)
   library(stats)
 ```
@@ -221,11 +222,18 @@ The Normal Q-Q plot displays the residuals overall following closely to the line
 ```
 
 Kaggle Submission:  
+Username: kiwi #2
+Score: 0.79716
+```{r}
+  knitr::include_graphics("/Users/suma/Desktop/KaggleUsernameScore.png")
+```
+
 ```{r}
   testData <- read.csv(file="/Users/suma/Desktop/CUNY SPS - Masters Data Science/DATA 605/house-prices-advanced-regression-techniques/test.csv", header=TRUE, sep=",")
 
 p <- predict(linearModel, testData)
 df <- data.frame(cbind(testData$Id, p))
 colnames(df) <- c("Id", "SalePrice")
+df <- replace(df, is.na(df),0)
 write.csv(df, file="model.csv", row.names = FALSE)
 ```
