@@ -1,9 +1,7 @@
 ---
 title: "DATA 605 - Final"
-author: "Suma Gopal"
 date: "12/15/2019"
 output: html_document
-runtime: shiny
 ---
 
 ```{r}
@@ -73,10 +71,7 @@ Descriptive and Inferential Statistics. Provide univariate descriptive statistic
   trainData <- read.csv(file="/Users/suma/Desktop/CUNY SPS - Masters Data Science/DATA 605/house-prices-advanced-regression-techniques/train.csv", header=TRUE, sep=",")
 
 # Display train data
-renderDT(
-  trainData, options = list(
-    pageLength = 5)
-  )
+datatable(trainData, options = list(pageLength = 5))
 
 # Summary Statistics
 summary(trainData)
@@ -162,7 +157,75 @@ LU decomposition on the matrix.
 
 Calculus-Based Probability & Statistics.  Many times, it makes sense to fit a closed form distribution to data.  Select a variable in the Kaggle.com training dataset that is skewed to the right, shift it so that the minimum value is absolutely above zero if necessary.  Then load the MASS package and run fitdistr to fit an exponential probability density function.  (See  https://stat.ethz.ch/R-manual/R-devel/library/MASS/html/fitdistr.html ).  Find the optimal value of λ for this distribution, and then take 1000 samples from this exponential distribution using this value (e.g., rexp(1000, λ)).  Plot a histogram and compare it with a histogram of your original variable.   Using the exponential pdf, find the 5th and 95th percentiles using the cumulative distribution function (CDF).   Also generate a 95% confidence interval from the empirical data, assuming normality.  Finally, provide the empirical 5th percentile and 95th percentile of the data. Discuss.  
 
+The samples histogram shows a right skewed distribution. Similarly, the GarageArea variable histogram somewhat resembles a right skewed distribution.  
 ```{r}
   library(MASS)
-  hist(trainData$GrLivArea)
+  library(spatstat)
+
+  # Select a variable in the Kaggle.com training dataset that is skewed to the right, shift it so that the minimum value is absolutely above zero if necessary.  
+  min <- min(trainData$GarageArea)
+  min
+  
+  # run fitdistr to fit an exponential probability density function
+  expPDF <- fitdistr(trainData$GarageArea, densfun = "exponential")
+  
+  # optimal value
+  lambda <- expPDF$estimate
+  
+  # samples histogram
+  hist(rexp(1000, lambda), breaks=100, main="Simulation PDF - 1000 Samples")
+  
+  # variable histogram
+  hist(trainData$GarageArea, breaks=100, main="Garage Area Variable")
+  
+  # Using the exponential pdf, find the 5th and 95th percentiles using the cumulative distribution function (CDF)
+  quantile(lambda, probs=c(0.05, 0.95))
+  
+  # generate a 95% confidence interval from the empirical data, assuming normality
+  qnorm(0.95, mean(trainData$GarageArea), sd(trainData$GarageArea))
+  
+  # provide the empirical 5th percentile and 95th percentile of the data
+  quantile(trainData$GarageArea, probs=c(0.05, 0.95))
+```
+
+Discuss:  
+The histograms tend to skew to the right and there is not much of a normal distribution amongst the mean. The simulation somewhat resembles the our variable  data's distribution more and less of a normal distribution. The empirical data percentile and normal distribution percentile were very close.  
+
+Modeling.  Build some type of multiple regression  model and submit your model to the competition board.  Provide your complete model summary and results with analysis.  Report your Kaggle.com user name and score.
+
+Linear Model:  
+
+```{r}
+linearModel <- lm(trainData$SalePrice ~ OverallCond + OverallQual + GarageArea + LotArea + YearBuilt, data=trainData)
+linearModel
+```
+
+Examine the summary: 
+If the line is a good fit, the residuals should be normally distributed arounda  mean of zero. Here we have have a median of -24492. A good model would have a median near zero and Min and Max of roughly the same magnitude. Below we have roughly similar magnitudes of Min -307954 and Max 390339. So far this model looks ok. The R^2 value explains 69.94% of the data's variation. The adjusted R^2 value takes into account the number predictors used in the model, and this value will always be smaller than the R^2 value.  
+
+```{r}
+summary(linearModel)
+```
+
+Residual Analysis:  
+
+Pairwise comparison of the data:  
+```{r}
+  pairs(trainData$SalePrice ~ OverallCond + OverallQual + GarageArea + LotArea + YearBuilt, data=trainData, gap=0.5)
+```
+
+The Normal Q-Q plot displays the residuals overall following closely to the line, which supports for a good model - but the ends diverge, with heavy tails. The histogram displays a normal looking (Gaussian) distribution centered at 0! This provides supports that our model is valid.
+```{r}
+  plot(linearModel, col=c("blue"))
+  hist(linearModel$residuals)
+```
+
+Kaggle Submission:  
+```{r}
+  testData <- read.csv(file="/Users/suma/Desktop/CUNY SPS - Masters Data Science/DATA 605/house-prices-advanced-regression-techniques/test.csv", header=TRUE, sep=",")
+
+p <- predict(linearModel, testData)
+df <- data.frame(cbind(testData$Id, p))
+colnames(df) <- c("Id", "SalePrice")
+write.csv(df, file="model.csv", row.names = FALSE)
 ```
